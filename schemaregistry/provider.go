@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ashleybill/srclient"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/riferrei/srclient"
 )
 
 // Provider -
@@ -47,13 +47,13 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	// Warning or errors can be collected in a slice type
 	var diags diag.Diagnostics
 
-	if (url != "") {
+	if url != "" {
 		client := srclient.CreateSchemaRegistryClient(url)
 
-		if (username != "") && (password != "") {		
-			client.SetCredentials(username, password)	
+		if (username != "") && (password != "") {
+			client.SetCredentials(username, password)
 		}
-		
+
 		return client, diags
 	}
 

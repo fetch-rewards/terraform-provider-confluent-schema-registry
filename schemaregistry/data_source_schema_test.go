@@ -2,7 +2,7 @@ package schemaregistry
 
 import (
 	"fmt"
-	"github.com/riferrei/srclient"
+	"github.com/ashleybill/srclient"
 	"os"
 	"strconv"
 	"strings"
@@ -72,11 +72,11 @@ func TestAccDataSourceSchemaReferences_basic(t *testing.T) {
 	}
 
 	// AND
-	if _, err = client.CreateSchemaWithArbitrarySubject(referencedSchemaSubject, referencedSchema, srclient.Avro); err != nil {
+	if _, err = client.CreateSchema(referencedSchemaSubject, referencedSchema, srclient.Avro); err != nil {
 		t.Fatalf("could not create schema for subject: %s, err: %s", referencedSchema, err)
 	}
 
-	if _, err = client.CreateSchemaWithArbitrarySubject(schemaWithReferenceSubject, schemaWithReference, srclient.Avro, references...); err != nil {
+	if _, err = client.CreateSchema(schemaWithReferenceSubject, schemaWithReference, srclient.Avro, references...); err != nil {
 		t.Fatalf("could not create schema for subject: %s, err: %s", referencedSchemaSubject, err)
 	}
 
@@ -133,11 +133,11 @@ func TestAccDataSourceSchema_atVersion(t *testing.T) {
 	referencedSchemaLatest := strings.Replace(fixtureAvro2, "\\", "", -1)
 
 	// AND
-	if _, err = client.CreateSchemaWithArbitrarySubject(referencedSchemaSubject, referencedSchema, srclient.Avro); err != nil {
+	if _, err = client.CreateSchema(referencedSchemaSubject, referencedSchema, srclient.Avro); err != nil {
 		t.Fatalf("could not create schema for subject: %s, err: %s", referencedSchema, err)
 	}
 
-	if _, err = client.CreateSchemaWithArbitrarySubject(referencedSchemaSubject, referencedSchemaLatest, srclient.Avro); err != nil {
+	if _, err = client.CreateSchema(referencedSchemaSubject, referencedSchemaLatest, srclient.Avro); err != nil {
 		t.Fatalf("could not create schema for subject: %s, err: %s", referencedSchema, err)
 	}
 

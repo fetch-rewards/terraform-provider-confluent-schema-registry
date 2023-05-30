@@ -69,6 +69,51 @@ func TestAccResourceSchema_updateCompatible(t *testing.T) {
 	})
 }
 
+func TestAccResourceSchema_updateRevert(t *testing.T) {
+	u, err := uuid.GenerateUUID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject := fmt.Sprintf("sub%s", u)
+
+	resource.Test(t, resource.TestCase{
+		ProviderFactories: testAccProviders,
+		PreCheck:          func() { testAccPreCheck(t) },
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(fixtureCreateSchema, subject, fixtureAvro1),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "id", subject),
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "subject", subject),
+					resource.TestCheckResourceAttrSet("schemaregistry_schema.test", "schema_id"),
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "version", "1"),
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "schema", strings.Replace(fixtureAvro1, "\\", "", -1)),
+				),
+			},
+			{
+				Config: fmt.Sprintf(fixtureCreateSchema, subject, fixtureAvro2),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "id", subject),
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "subject", subject),
+					resource.TestCheckResourceAttrSet("schemaregistry_schema.test", "schema_id"),
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "version", "2"),
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "schema", strings.Replace(fixtureAvro2, "\\", "", -1)),
+				),
+			},
+			{
+				Config: fmt.Sprintf(fixtureCreateSchema, subject, fixtureAvro1),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "id", subject),
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "subject", subject),
+					resource.TestCheckResourceAttrSet("schemaregistry_schema.test", "schema_id"),
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "version", "1"),
+					resource.TestCheckResourceAttr("schemaregistry_schema.test", "schema", strings.Replace(fixtureAvro1, "\\", "", -1)),
+				),
+			},
+		},
+	})
+}
+
 func TestAccResourceSchema_updateIncompatible(t *testing.T) {
 	u, err := uuid.GenerateUUID()
 	if err != nil {
@@ -249,7 +294,7 @@ func TestAccResourceSchemaReferences_basic(t *testing.T) {
 				Steps: []resource.TestStep{
 					{
 						Config: config,
-						Check: resource.ComposeTestCheckFunc(tc.check...),
+						Check:  resource.ComposeTestCheckFunc(tc.check...),
 					},
 				},
 			})
@@ -293,7 +338,7 @@ func TestAccResourceSchemaReferences_validateSchema(t *testing.T) {
 						},
 					},
 				}),
-				ExpectError: regexp.MustCompile(regexp.QuoteMeta(`Invalid schema ["invalid.schema"] with refs`)),
+				ExpectError: regexp.MustCompile(regexp.QuoteMeta(`Invalid schema [\"invalid.schema\"] with refs`)),
 			},
 		},
 	})
@@ -450,7 +495,7 @@ func TestAccResourceSchemaReferences_updateIncompatible(t *testing.T) {
 						},
 					},
 				}),
-				ExpectError: regexp.MustCompile(regexp.QuoteMeta(`Invalid schema ["akc.test.incompatible"] with refs`)),
+				ExpectError: regexp.MustCompile(regexp.QuoteMeta(`Invalid schema [\"akc.test.incompatible\"] with refs`)),
 			},
 		},
 	})

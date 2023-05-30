@@ -6,10 +6,10 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 
+	"github.com/ashleybill/srclient"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/structure"
-	"github.com/riferrei/srclient"
 )
 
 func resourceSchema() *schema.Resource {
@@ -98,18 +98,11 @@ func schemaCreate(ctx context.Context, d *schema.ResourceData, meta interface{})
 	subject := d.Get("subject").(string)
 	schemaString := d.Get("schema").(string)
 	references := ToRegistryReferences(d.Get("reference").([]interface{}))
-	schemaType := srclient.Avro
-
-	if d.Get("schema_type").(string) == "json" {
-		schemaType = srclient.Json
-	}
-	if d.Get("schema_type").(string) == "protobuf" {
-		schemaType = srclient.Protobuf
-	}
+	schemaType := ToSchemaType(d.Get("schema_type"))
 
 	client := meta.(*srclient.SchemaRegistryClient)
 
-	schema, err := client.CreateSchemaWithArbitrarySubject(subject, schemaString, schemaType, references...)
+	schema, err := client.CreateSchema(subject, schemaString, schemaType, references...)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -132,18 +125,11 @@ func schemaUpdate(ctx context.Context, d *schema.ResourceData, meta interface{})
 	subject := d.Get("subject").(string)
 	schemaString := d.Get("schema").(string)
 	references := ToRegistryReferences(d.Get("reference").([]interface{}))
-	schemaType := srclient.Avro
-
-	if d.Get("schema_type").(string) == "json" {
-		schemaType = srclient.Json
-	}
-	if d.Get("schema_type").(string) == "protobuf" {
-		schemaType = srclient.Protobuf
-	}
+	schemaType := ToSchemaType(d.Get("schema_type"))
 
 	client := meta.(*srclient.SchemaRegistryClient)
 
-	schema, err := client.CreateSchemaWithArbitrarySubject(subject, schemaString, schemaType, references...)
+	schema, err := client.CreateSchema(subject, schemaString, schemaType, references...)
 	if err != nil {
 		if strings.Contains(err.Error(), "409") {
 			return diag.Errorf(`invalid "schema": incompatible`)
@@ -168,7 +154,18 @@ func schemaRead(ctx context.Context, d *schema.ResourceData, meta interface{}) d
 	client := meta.(*srclient.SchemaRegistryClient)
 	subject := extractSchemaVersionID(d.Id())
 
-	schema, err := client.GetLatestSchemaWithArbitrarySubject(subject)
+	newSchema := d.Get("schema")
+	references := ToRegistryReferences(d.Get("reference").([]interface{}))
+	schemaType := ToSchemaType(d.Get("schema_type"))
+
+	var schema *srclient.Schema
+	var err error
+
+	if newSchema == nil {
+		schema, err = client.GetLatestSchema(subject)
+	} else {
+		schema, err = client.LookupSchema(subject, newSchema.(string), schemaType, references...)
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -214,6 +211,19 @@ func FromRegistryReferences(references []srclient.Reference) []interface{} {
 	}
 
 	return refs
+}
+
+func ToSchemaType(schemaType interface{}) srclient.SchemaType {
+	returnType := srclient.Avro
+
+	if schemaType == "json" {
+		returnType = srclient.Json
+	}
+	if schemaType == "protobuf" {
+		returnType = srclient.Protobuf
+	}
+
+	return returnType
 }
 
 func ToRegistryReferences(references []interface{}) []srclient.Reference {

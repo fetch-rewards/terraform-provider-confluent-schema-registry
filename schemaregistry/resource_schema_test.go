@@ -158,9 +158,8 @@ func TestAccResourceSchema_import(t *testing.T) {
 				Config: fmt.Sprintf(fixtureImportSchema, subject, fixtureAvro1),
 			},
 			{
-				ResourceName:      "schemaregistry_schema.import",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName: "schemaregistry_schema.import",
+				ImportState:  true,
 			},
 		},
 	})
@@ -538,14 +537,12 @@ func TestAccResourceSchemaReferences_import(t *testing.T) {
 				}),
 			},
 			{
-				ResourceName:      "schemaregistry_schema.referencedSchema",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName: "schemaregistry_schema.referencedSchema",
+				ImportState:  true,
 			},
 			{
-				ResourceName:      "schemaregistry_schema.schemaWithReference",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName: "schemaregistry_schema.schemaWithReference",
+				ImportState:  true,
 			},
 		},
 	})

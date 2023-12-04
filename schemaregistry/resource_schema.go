@@ -2,6 +2,7 @@ package schemaregistry
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
@@ -132,7 +133,7 @@ func schemaUpdate(ctx context.Context, d *schema.ResourceData, meta interface{})
 	schema, err := client.CreateSchema(subject, schemaString, schemaType, references...)
 	if err != nil {
 		if strings.Contains(err.Error(), "409") {
-			return diag.Errorf(`invalid "schema": incompatible`)
+			return diag.Errorf(`invalid "schema": incompatible. your schema has the compatability type set to BACKWARD. this means you can only perform the following: delete field, create OPTIONAL fields.`)
 		}
 		return diag.FromErr(err)
 	}
@@ -150,7 +151,6 @@ func schemaUpdate(ctx context.Context, d *schema.ResourceData, meta interface{})
 
 func schemaRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
-	// TODO: i think this might be part of the issue. The id changes everytime
 	client := meta.(*srclient.SchemaRegistryClient)
 	subject := extractSchemaVersionID(d.Id())
 	//TODO
@@ -166,11 +166,14 @@ func schemaRead(ctx context.Context, d *schema.ResourceData, meta interface{}) d
 	var err error
 
 	if newSchema == nil {
+		fmt.Println("getting latest schema")
 		schema, err = client.GetLatestSchema(subject)
 	} else {
+		fmt.Println("looking up schema")
 		schema, err = client.LookupSchema(subject, newSchema.(string), schemaType, references...)
 	}
 	if err != nil {
+		fmt.Println("error getting or looking up schema")
 		return diag.FromErr(err)
 	}
 

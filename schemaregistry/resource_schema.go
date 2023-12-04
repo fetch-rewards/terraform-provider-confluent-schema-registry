@@ -105,7 +105,7 @@ func schemaCreate(ctx context.Context, d *schema.ResourceData, meta interface{})
 
 	schema, err := client.CreateSchema(subject, schemaString, schemaType, references...)
 	if err != nil {
-		return diag.FromErr(err)
+		return diag.FromErr(fmt.Errorf("error creating in the createschema function: %w", err))
 	}
 
 	d.SetId(formatSchemaVersionID(subject))
@@ -135,7 +135,7 @@ func schemaUpdate(ctx context.Context, d *schema.ResourceData, meta interface{})
 		if strings.Contains(err.Error(), "409") {
 			return diag.Errorf(`invalid "schema": incompatible. your schema has the compatability type set to BACKWARD. this means you can only perform the following: delete field, create OPTIONAL fields.`)
 		}
-		return diag.FromErr(err)
+		return diag.FromErr(fmt.Errorf("error creating in the updateschema function: %w", err))
 	}
 
 	d.Set("schema_id", schema.ID())
@@ -174,7 +174,7 @@ func schemaRead(ctx context.Context, d *schema.ResourceData, meta interface{}) d
 	}
 	if err != nil {
 		fmt.Println("error getting or looking up schema")
-		return diag.FromErr(err)
+		return diag.FromErr(fmt.Errorf("error getting or looking up schema: %w", err))
 	}
 
 	d.Set("schema", schema.Schema())

@@ -157,7 +157,7 @@ func schemaRead(ctx context.Context, d *schema.ResourceData, meta interface{}) d
 	// I feel like we want to 1. get the latest schema from the client (in case a change was made in UI)
 	// 2. compare the latest schema to the schema in tf state
 	// 3. if they are different, show the difference and say that the schema is going to be changed (back to what it was?) -- that would possibly give incompaatable error, because we
-
+	// TODO
 	newSchema := d.Get("schema")
 	references := ToRegistryReferences(d.Get("reference").([]interface{}))
 	schemaType := ToSchemaType(d.Get("schema_type"))

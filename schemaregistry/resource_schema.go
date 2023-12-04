@@ -168,13 +168,15 @@ func schemaRead(ctx context.Context, d *schema.ResourceData, meta interface{}) d
 	if newSchema == nil {
 		fmt.Println("getting latest schema")
 		schema, err = client.GetLatestSchema(subject)
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("error getting last schema: %w", err))
+		}
 	} else {
 		fmt.Println("looking up schema")
 		schema, err = client.LookupSchema(subject, newSchema.(string), schemaType, references...)
-	}
-	if err != nil {
-		fmt.Println("error getting or looking up schema")
-		return diag.FromErr(fmt.Errorf("error getting or looking up schema: %w", err))
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("error looking up schema: %w. newSchema is %v", err, newSchema))
+		}
 	}
 
 	d.Set("schema", schema.Schema())

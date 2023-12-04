@@ -49,11 +49,6 @@ release:
   github:
     owner: "fetch-rewards"
     name: "terraform-provider-confluent-schema-registry"
-  draft: true
+ # draft: true TODO after testing set this back to true
 changelog:
   skip: true
-#release:
-#  # If you want to manually examine the release before its live, uncomment this line:
-#  draft: true
-#changelog:
-#  skip: true

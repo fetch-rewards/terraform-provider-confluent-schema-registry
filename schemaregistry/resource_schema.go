@@ -109,9 +109,18 @@ func schemaCreate(ctx context.Context, d *schema.ResourceData, meta interface{})
 	}
 
 	d.SetId(formatSchemaVersionID(subject))
-	d.Set("schema_id", schema.ID())
-	d.Set("schema", schema.Schema())
-	d.Set("version", schema.Version())
+
+	if err = d.Set("schema_id", schema.ID()); err != nil {
+		return diag.FromErr(fmt.Errorf("error in schemaCreate with setting schema_id: %w", err))
+	}
+
+	if err = d.Set("schema", schema.Schema()); err != nil {
+		return diag.FromErr(fmt.Errorf("error in schemaCreate with setting schema: %w", err))
+	}
+
+	if err = d.Set("version", schema.Version()); err != nil {
+		return diag.FromErr(fmt.Errorf("error in schemaCreate with setting version: %w", err))
+	}
 
 	if err = d.Set("reference", FromRegistryReferences(schema.References())); err != nil {
 		return diag.FromErr(err)
@@ -138,9 +147,17 @@ func schemaUpdate(ctx context.Context, d *schema.ResourceData, meta interface{})
 		return diag.FromErr(fmt.Errorf("error creating in the updateschema function: %w", err))
 	}
 
-	d.Set("schema_id", schema.ID())
-	d.Set("schema", schema.Schema())
-	d.Set("version", schema.Version())
+	if err = d.Set("schema_id", schema.ID()); err != nil {
+		return diag.FromErr(fmt.Errorf("error in schemaUpdate with setting schema_id: %w", err))
+	}
+
+	if err = d.Set("schema", schema.Schema()); err != nil {
+		return diag.FromErr(fmt.Errorf("error in schemaUpdate with setting schema: %w", err))
+	}
+
+	if err = d.Set("version", schema.Version()); err != nil {
+		return diag.FromErr(fmt.Errorf("error in schemaUpdate with setting version: %w", err))
+	}
 
 	if err = d.Set("reference", FromRegistryReferences(schema.References())); err != nil {
 		return diag.FromErr(err)
@@ -158,7 +175,7 @@ func schemaRead(ctx context.Context, d *schema.ResourceData, meta interface{}) d
 	// 2. compare the latest schema to the schema in tf state
 	// 3. if they are different, show the difference and say that the schema is going to be changed (back to what it was?) -- that would possibly give incompaatable error, because we
 	// TODO
-	newSchema := d.Get("schema")
+	newSchema := d.Get("schema") // TODO this is getting it from state. so if it is fucked up in state....
 	references := ToRegistryReferences(d.Get("reference").([]interface{}))
 	schemaType := ToSchemaType(d.Get("schema_type"))
 
@@ -175,14 +192,24 @@ func schemaRead(ctx context.Context, d *schema.ResourceData, meta interface{}) d
 		fmt.Println("looking up schema")
 		schema, err = client.LookupSchema(subject, newSchema.(string), schemaType, references...)
 		if err != nil {
+			// TODO: it is breaking here on terraform plan when we change things in terraform
 			return diag.FromErr(fmt.Errorf("error looking up schema: %w. newSchema is %v", err, newSchema))
 		}
 	}
 
-	d.Set("schema", schema.Schema())
-	d.Set("schema_id", schema.ID())
-	d.Set("subject", subject)
-	d.Set("version", schema.Version())
+	if err = d.Set("schema_id", schema.ID()); err != nil {
+		return diag.FromErr(fmt.Errorf("error in schemaRead with setting schema_id: %w", err))
+	}
+
+	if err = d.Set("schema", schema.Schema()); err != nil {
+		return diag.FromErr(fmt.Errorf("error in schemaRead with setting schema: %w", err))
+	}
+	if err = d.Set("subject", subject); err != nil {
+		return diag.FromErr(fmt.Errorf("error in schemaRead with setting subject: %w", err))
+	}
+	if err = d.Set("version", schema.Version()); err != nil {
+		return diag.FromErr(fmt.Errorf("error in schemaRead with setting version: %w", err))
+	}
 
 	if err = d.Set("reference", FromRegistryReferences(schema.References())); err != nil {
 		return diag.FromErr(err)

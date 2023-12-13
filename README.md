@@ -130,6 +130,7 @@ output "schema_string" {
 terraform import schemaregistry_schema.main <subject_name>
 `
 
+## Local testing/development
 The `test-new-build.sh` script can be used to easily test the provider locally. It will build the provider, copy it to the local plugins directory, and run `terraform init` in the `terraform-test-files` directory.
 
 From the terraform-test-files directory, you can run your commands as you normally would to test your provider changes, ie `terraform apply`, `terraform plan`, etc.

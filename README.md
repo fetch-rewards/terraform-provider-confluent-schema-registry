@@ -1,6 +1,18 @@
 # terraform-provider-confluent-schema-registry
 A terraform provider for managing schemas in a Confluent schema registry
 
+## Developing at Fetch
+The local development workflow
+https://github.com/hashicorp/terraform-provider-aws/issues/5396
+08:32
+1. make go code change
+2. make build
+3. cp to new place in plugins dir
+   4.    $ cp dist/terraform-provider-schemaregistry ~/.terraform.d/plugins/local/fetch-rewards/confluent-schema-registry/1.1.0/darwin_arm64/terraform-provider-confluent-schema-registry_1.1.0
+4. delete providers in .terraform
+5. delete .terraform.lock.hcl
+6. terraform init
+
 ## Provider configuration
 ```
 terraform {
@@ -117,3 +129,13 @@ output "schema_string" {
 `
 terraform import schemaregistry_schema.main <subject_name>
 `
+
+The `test-new-build.sh` script can be used to easily test the provider locally. It will build the provider, copy it to the local plugins directory, and run `terraform init` in the `terraform-test-files` directory.
+
+From the terraform-test-files directory, you can run your commands as you normally would to test your provider changes, ie `terraform apply`, `terraform plan`, etc.
+
+To see any logging that you added to the provider (using tflog) you can add the environment variable `TF_LOG=INFO` to your command, ie `TF_LOG=INFO terraform apply`.
+
+An example of using tflog to log a message in the provider is below:
+
+```tflog.Info(ctx, "Configuring SchemaRegistry client")```

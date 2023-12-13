@@ -105,22 +105,13 @@ func schemaCreate(ctx context.Context, d *schema.ResourceData, meta interface{})
 
 	schema, err := client.CreateSchema(subject, schemaString, schemaType, references...)
 	if err != nil {
-		return diag.FromErr(fmt.Errorf("error creating in the createschema function: %w", err))
+		return diag.FromErr(err)
 	}
 
 	d.SetId(formatSchemaVersionID(subject))
-
-	if err = d.Set("schema_id", schema.ID()); err != nil {
-		return diag.FromErr(fmt.Errorf("error in schemaCreate with setting schema_id: %w", err))
-	}
-
-	if err = d.Set("schema", schema.Schema()); err != nil {
-		return diag.FromErr(fmt.Errorf("error in schemaCreate with setting schema: %w", err))
-	}
-
-	if err = d.Set("version", schema.Version()); err != nil {
-		return diag.FromErr(fmt.Errorf("error in schemaCreate with setting version: %w", err))
-	}
+	d.Set("schema_id", schema.ID())
+	d.Set("schema", schema.Schema())
+	d.Set("version", schema.Version())
 
 	if err = d.Set("reference", FromRegistryReferences(schema.References())); err != nil {
 		return diag.FromErr(err)
@@ -136,28 +127,40 @@ func schemaUpdate(ctx context.Context, d *schema.ResourceData, meta interface{})
 	schemaString := d.Get("schema").(string)
 	references := ToRegistryReferences(d.Get("reference").([]interface{}))
 	schemaType := ToSchemaType(d.Get("schema_type"))
-
+	currentSchemaId := d.Get("schema_id").(int)
 	client := meta.(*srclient.SchemaRegistryClient)
 
+	// This CreateSchema call does not fail if the schema already exists -- it just returns the schema.
+	// This isn't ideal because if we update a schema with an OLD schema string, it will just return that old version
+	// without updating the newest version to that version.
+	// This results in a permanent diff in terraform -- because the latest schema is not matching what is in our new terraform.
 	schema, err := client.CreateSchema(subject, schemaString, schemaType, references...)
 	if err != nil {
 		if strings.Contains(err.Error(), "409") {
-			return diag.Errorf(`invalid "schema": incompatible. your schema has the compatability type set to BACKWARD. this means you can only perform the following: delete field, create OPTIONAL fields.`)
+			return diag.FromErr(fmt.Errorf("invalid 'schema': Incompatible. Please check the compatability level of your schema and compare it against the allowed actions found here: https://docs.confluent.io/cloud/current/sr/fundamentals/schema-evolution.html#compatibility-types."))
 		}
-		return diag.FromErr(fmt.Errorf("error creating in the updateschema function: %w", err))
+		return diag.FromErr(err)
 	}
 
-	if err = d.Set("schema_id", schema.ID()); err != nil {
-		return diag.FromErr(fmt.Errorf("error in schemaUpdate with setting schema_id: %w", err))
+	// If the schema returned from the above call is that of an EXISTING schema, we now do a soft delete on the old
+	//schema and then recreate it, so that the "old" version is now the most updated version and our state matches
+	//(soft delete just de-registers if from the subject it i think? but it still exists)
+	if schema.ID() < currentSchemaId {
+		err = client.DeleteSubjectByVersion(subject, schema.Version(), false)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		schema, err = client.CreateSchema(subject, schemaString, schemaType, references...)
+		if err != nil {
+			if strings.Contains(err.Error(), "409") {
+				return diag.FromErr(fmt.Errorf("invalid 'schema': Incompatible. Please check the compatability level of your schema and compare it against the allowed actions found here: https://docs.confluent.io/cloud/current/sr/fundamentals/schema-evolution.html#compatibility-types."))
+			}
+			return diag.FromErr(err)
+		}
 	}
-
-	if err = d.Set("schema", schema.Schema()); err != nil {
-		return diag.FromErr(fmt.Errorf("error in schemaUpdate with setting schema: %w", err))
-	}
-
-	if err = d.Set("version", schema.Version()); err != nil {
-		return diag.FromErr(fmt.Errorf("error in schemaUpdate with setting version: %w", err))
-	}
+	d.Set("schema_id", schema.ID())
+	d.Set("schema", schema.Schema())
+	d.Set("version", schema.Version())
 
 	if err = d.Set("reference", FromRegistryReferences(schema.References())); err != nil {
 		return diag.FromErr(err)
@@ -168,50 +171,26 @@ func schemaUpdate(ctx context.Context, d *schema.ResourceData, meta interface{})
 
 func schemaRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
+
 	client := meta.(*srclient.SchemaRegistryClient)
 	subject := extractSchemaVersionID(d.Id())
-	//TODO
-	// I feel like we want to 1. get the latest schema from the client (in case a change was made in UI)
-	// 2. compare the latest schema to the schema in tf state
-	// 3. if they are different, show the difference and say that the schema is going to be changed (back to what it was?) -- that would possibly give incompaatable error, because we
-	// TODO
-	newSchema := d.Get("schema") // TODO this is getting it from state. so if it is fucked up in state....
-	references := ToRegistryReferences(d.Get("reference").([]interface{}))
-	schemaType := ToSchemaType(d.Get("schema_type"))
 
-	var schema *srclient.Schema
 	var err error
-
-	if newSchema == nil {
-		fmt.Println("getting latest schema")
-		schema, err = client.GetLatestSchema(subject)
-		if err != nil {
-			return diag.FromErr(fmt.Errorf("error getting last schema: %w", err))
-		}
-	} else {
-		fmt.Println("looking up schema")
-		schema, err = client.LookupSchema(subject, newSchema.(string), schemaType, references...)
-		if err != nil {
-			// TODO: it is breaking here on terraform plan when we change things in terraform
-			return diag.FromErr(fmt.Errorf("error looking up schema: %w. newSchema is %v", err, newSchema))
-		}
+	// before, the provider tried to look up the schema by the schema string.
+	// The issue was that when a terraform apply ran and failed, it was looking for a schema string that didn't exist (before the tf state gets updated even on a failure)
+	// now, we do not use the tf state to refresh -- we get the latest schema from the registry
+	latestSchema, err := client.GetLatestSchema(subject)
+	if err != nil {
+		return diag.FromErr(fmt.Errorf("error getting last schema: %w", err))
 	}
 
-	if err = d.Set("schema_id", schema.ID()); err != nil {
-		return diag.FromErr(fmt.Errorf("error in schemaRead with setting schema_id: %w", err))
-	}
+	// At this point, the schema read in matches the most recent version found in the kafka ui/registry
+	d.Set("schema", latestSchema.Schema())
+	d.Set("schema_id", latestSchema.ID())
+	d.Set("subject", subject)
+	d.Set("version", latestSchema.Version())
 
-	if err = d.Set("schema", schema.Schema()); err != nil {
-		return diag.FromErr(fmt.Errorf("error in schemaRead with setting schema: %w", err))
-	}
-	if err = d.Set("subject", subject); err != nil {
-		return diag.FromErr(fmt.Errorf("error in schemaRead with setting subject: %w", err))
-	}
-	if err = d.Set("version", schema.Version()); err != nil {
-		return diag.FromErr(fmt.Errorf("error in schemaRead with setting version: %w", err))
-	}
-
-	if err = d.Set("reference", FromRegistryReferences(schema.References())); err != nil {
+	if err = d.Set("reference", FromRegistryReferences(latestSchema.References())); err != nil {
 		return diag.FromErr(err)
 	}
 

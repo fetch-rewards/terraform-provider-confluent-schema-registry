@@ -18,15 +18,16 @@ https://github.com/hashicorp/terraform-provider-aws/issues/5396
 terraform {
     required_providers {
         schemaregistry = {
-            source = "arkiaconsulting/confluent-schema-registry"
+            source = "fetch-rewards/confluent-schema-registry"
         }
     }
 }
 
 provider "schemaregistry" {
-    schema_registry_url = "https://xxxxxx.confluent.cloud"
-    username            = "<confluent_schema_registry_key>"
-    password            = "<confluent_schema_registry_password>"
+    schema_registry_url = "https://<env>-event-tracking-schema-registry.fetchrewards.com"
+    # Below configs are not needed for our SR as we dont have auth enabled
+    # username            = "<confluent_schema_registry_key>"
+    # password            = "<confluent_schema_registry_password>"
 }
 ```
 _You can omit the credential details by defining the environment variables `SCHEMA_REGISTRY_URL`, `SCHEMA_REGISTRY_USERNAME`, `SCHEMA_REGISTRY_PASSWORD`_

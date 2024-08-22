@@ -6,6 +6,7 @@ import (
 
 	"github.com/ashleybill/srclient"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -58,6 +59,23 @@ func dataSourceSchema() *schema.Resource {
 				},
 			},
 		},
+		CustomizeDiff: customdiff.All(
+			customdiff.ValidateChange("schema", func(ctx context.Context, old, new, meta any) error {
+				// If we are increasing "size" then the new value must be
+				// a multiple of the old value.
+
+				println(old.(string))
+				println(new.(string))
+
+				if new.(int) <= old.(int) {
+					return nil
+				}
+				if (new.(int) % old.(int)) != 0 {
+					return fmt.Errorf("new size value must be an integer multiple of old value %d", old.(int))
+				}
+				return nil
+			}),
+		),
 	}
 }
 

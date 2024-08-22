@@ -1,10 +1,11 @@
 # TEST?=$$(go list ./schemaregistry/... | grep -v 'vendor')
 TEST?=./schemaregistry/...
-HOSTNAME=github.com
-NAMESPACE=arkiaconsulting
-NAME=schemaregistry
+HOSTNAME=local
+NAMESPACE=fetch-rewards
+NAME=confluent-schema-registry
 BINARY=terraform-provider-${NAME}
-VERSION=0.6
+VERSION=1.1.0
+# change this based on system arch linux_amd64 or darwin_arm64
 OS_ARCH=linux_amd64
 
 default: install
@@ -29,6 +30,10 @@ release:
 install: build
 	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
 	mv ./dist/${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
+
+local_install: build
+	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
+	cp ./dist/${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}/${BINARY}_${VERSION}
 
 test: 
 	go test -i $(TEST) || exit 1                                                   

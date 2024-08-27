@@ -38,20 +38,17 @@ func resourceSchema() *schema.Resource {
 					oldJSON, _ := structure.NormalizeJsonString(oldState)
 					schemaHasChange = newJSON != oldJSON
 				} else if strings.ToLower(schemaTypeStr) == "protobuf" {
-					newProtoString, err := FormatProtobufString(newState.(string))
+					schemaEquals, err := CompareASTs(newState.(string), oldState.(string))
 					if err != nil {
 						// If theres an error diff should be true, indicating something is wrong?
-						println("err")
-					}
-					oldProtoString, err := FormatProtobufString(oldState.(string))
-					if err != nil {
-						println("err")
+						log.Printf("[INFO] err")
 					}
 
-					schemaHasChange = oldProtoString != newProtoString
+					schemaHasChange = !schemaEquals
+
 				}
 			}
-			log.Printf("[INFO] Schemas Equal %t", schemaHasChange)
+			log.Printf("[INFO] Schemas Change %t", schemaHasChange)
 			log.Printf("[INFO] Version Change %t", d.HasChange("version"))
 
 			return schemaHasChange || d.HasChange("version")
@@ -80,19 +77,21 @@ func resourceSchema() *schema.Resource {
 							oldJSON, _ := structure.NormalizeJsonString(old)
 							schemaEquals = newJSON == oldJSON
 						} else if strings.ToLower(schemaTypeStr) == "protobuf" {
-							newProtoString, err := FormatProtobufString(new)
-							if err != nil {
-								println("err")
-							}
+							log.Printf("[INFO] Schemas new %s", new)
+							log.Printf("[INFO] Schemas old %s", old)
+							var err error
+							schemaEquals, err = CompareASTs(new, old)
 
-							oldProtoString, err := FormatProtobufString(old)
+							log.Printf("[INFO] Schemas equals %v", schemaEquals)
 							if err != nil {
-								println("err")
+								// If theres an error diff should be true, indicating something is wrong?
+								log.Printf("[INFO] err %v", schemaEquals)
 							}
-
-							schemaEquals = newProtoString == oldProtoString
 						}
 					}
+
+					log.Printf("[INFO] Schemas Equal %s %t", d.Get("schema_type").(string), schemaEquals)
+
 					return schemaEquals
 				},
 			},

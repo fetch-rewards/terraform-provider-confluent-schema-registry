@@ -34,7 +34,7 @@ func TestCreateTemporaryProtoFile(t *testing.T) {
 
 }
 
-func TestBufFormatting(t *testing.T) {
+func TestProtoCompileASTComparison(t *testing.T) {
 	originalProtoSchema := `syntax = "proto3";package com.fetchrewards.locationservice.proto;option java_outer_classname = "FidoLocationTrackerProto";
 	
 	
@@ -45,11 +45,6 @@ func TestBufFormatting(t *testing.T) {
 	   string fido = 2;}
 	
 	`
-	formattedProtoSchema, err := FormatProtobufString(originalProtoSchema)
-
-	if err != nil {
-		t.Error("Proto string formatter should not error")
-	}
 
 	expectedProtoSchema := "syntax = \"proto3\";\n" +
 		"package com.fetchrewards.locationservice.proto;\n\n" +
@@ -59,25 +54,70 @@ func TestBufFormatting(t *testing.T) {
 		"  string fido = 2;\n" +
 		"}\n"
 
-	if formattedProtoSchema != expectedProtoSchema {
+	schemaEquals, err := CompareASTs(originalProtoSchema, expectedProtoSchema)
+
+	if err != nil {
+		t.Error("Proto string formatter should not error")
+	}
+
+	if !schemaEquals {
 		t.Errorf(
-			"Formatted Proto Schema does not match expected Schema\nexpected:\n`%s`\n\nactual:\n`%s`",
+			"Original Proto Schema does not match expected Schema\nexpected:\n`%s`\n\nactual:\n`%s`",
+			originalProtoSchema,
 			expectedProtoSchema,
-			formattedProtoSchema,
 		)
 	}
 }
 
-func TestMalfromedProtoFileFormatting(t *testing.T) {
-	// Expect a file that is not actually a proto schema to have a nil pointer dereference exception error
-	originalProtoSchema := "Not a Protobuf schema"
-	formattedProtoSchema, err := FormatProtobufString(originalProtoSchema)
+func TestProtoCompileASTComparisonFidoTracking(t *testing.T) {
+	newSchema := `syntax = "proto3";package com.fetchrewards.locationservice.proto;
 
-	if formattedProtoSchema != "" {
-		t.Error("Expected formatted proto schema to be an empty string")
+
+	option java_outer_classname = "FidoLocationTrackerProto";
+	
+	message FidoLocationTracker {
+	  string location_id = 1;
+	  string fido = 2;}
+	
+	`
+
+	oldSchema := `syntax = "proto3";
+	package com.fetchrewards.locationservice.proto;
+	
+	option java_outer_classname = "FidoLocationTrackerProto";
+	
+	message FidoLocationTracker {
+	  string location_id = 1;
+	  string fido = 2;
+	}`
+
+	schemaEquals, err := CompareASTs(newSchema, oldSchema)
+
+	if err != nil {
+		t.Error("Proto string formatter should not error")
 	}
 
-	if !strings.Contains(err.Error(), "failed to format proto file") {
+	if !schemaEquals {
+		t.Errorf(
+			"Original Proto Schema does not match expected Schema\nexpected:\n`%s`\n\nactual:\n`%s`",
+			newSchema,
+			oldSchema,
+		)
+	}
+}
+
+func TestMalformedProtoFileFormatting(t *testing.T) {
+	// Expect a file that is not actually a proto schema to have a nil pointer dereference exception error
+	originalProtoSchema := "Not a Protobuf schema"
+	expectedProtoSchema := "Not a Protobuf schema"
+
+	schemaEquals, err := CompareASTs(originalProtoSchema, expectedProtoSchema)
+
+	if schemaEquals {
+		t.Error("Expected schemaEquals to be false")
+	}
+
+	if !strings.Contains(err.Error(), "error parsing .proto file") {
 		t.Errorf("expected error to contain 'failed to format proto file', but got: %v", err)
 	}
 

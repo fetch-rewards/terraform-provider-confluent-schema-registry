@@ -6,21 +6,14 @@ toolchain go1.21.4
 
 require (
 	github.com/ashleybill/srclient v0.6.3
+	github.com/bufbuild/protocompile v0.14.0
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.26.1
 )
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/bufbuild/buf v1.38.0 // indirect
-	github.com/bufbuild/protocompile v0.14.0 // indirect
-	github.com/gofrs/uuid/v5 v5.3.0 // indirect
 	github.com/jhump/protoreflect v1.16.0 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
-	go.opentelemetry.io/otel v1.28.0 // indirect
-	go.opentelemetry.io/otel/trace v1.28.0 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
-	go.uber.org/multierr v1.11.0 // indirect
 )
 
 require (

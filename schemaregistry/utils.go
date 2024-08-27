@@ -1,18 +1,13 @@
 package schemaregistry
 
 import (
-	"context"
 	"fmt"
-	"io"
+	"log"
 	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
+	"reflect"
 
-	"github.com/bufbuild/buf/private/buf/bufformat"
-	"github.com/bufbuild/buf/private/bufpkg/bufmodule"
-	"github.com/bufbuild/buf/private/pkg/storage/storageos"
-	"github.com/bufbuild/buf/private/pkg/tracing"
+	"github.com/bufbuild/protocompile/parser"
+	"github.com/bufbuild/protocompile/reporter"
 )
 
 const IDSeparator = "___"
@@ -59,65 +54,57 @@ func CreateTemporaryProtoFile(protoSchemaString string) (string, error) {
 	return tempFileName, err
 }
 
-func FormatProtobufString(protoSchemaString string) (string, error) {
-	var finalErr error = nil
-	var fileContent string = ""
-
-	re := regexp.MustCompile(`\s+`)
-	protoSchemaString = re.ReplaceAllString(protoSchemaString, " ")
-
-	// Need to add two new lines before message to take care of the case when the "option" line
-	// Does not have two lines after it, otherwise formatting is off
-	newProtoSchemaString := strings.ReplaceAll(protoSchemaString, "message", "\n\nmessage")
-
-	fullFilepath, err := CreateTemporaryProtoFile(newProtoSchemaString)
+// CompareASTs compares two AST nodes for equality
+func CompareASTs(protoSchemaString1 string, protoSchemaString2 string) (bool, error) {
+	filePath1, err := CreateTemporaryProtoFile(protoSchemaString1)
 
 	if err != nil {
-		return fileContent, fmt.Errorf("failed to create temporary proto file: %w", err)
+		return false, fmt.Errorf("failed to create temporary proto file: %w", err)
 	}
 
-	protoSchemaDir := filepath.Dir(fullFilepath)
-	fileName := filepath.Base(fullFilepath) //Need to split on '/' and get last element
-
-	// Not sure what context is doing here other than a mandatory parameter
-	ctx := context.Background()
-
-	bucket, err := storageos.NewProvider().NewReadWriteBucket(protoSchemaDir)
+	filePath2, err := CreateTemporaryProtoFile(protoSchemaString2)
 
 	if err != nil {
-		return fileContent, fmt.Errorf("failed to get proto file bucket: %w", err)
+		return false, fmt.Errorf("failed to create temporary proto file: %w", err)
 	}
 
-	moduleSetBuilder := bufmodule.NewModuleSetBuilder(ctx, tracing.NopTracer, bufmodule.NopModuleDataProvider, bufmodule.NopCommitProvider)
-
-	moduleSetBuilder.AddLocalModule(bucket, protoSchemaDir, true)
-
-	moduleSet, err := moduleSetBuilder.Build()
-
+	// Parse the .proto file
+	node1, err := parseProtoFile(filePath1)
 	if err != nil {
-		return fileContent, fmt.Errorf("failed to build proto file formatter: %w", err)
+		return false, fmt.Errorf("error parsing .proto file: %v", err)
 	}
 
-	// At this point all the files are formatted
-	readBucket, err := bufformat.FormatModuleSet(ctx, moduleSet)
-
+	// Parse the .proto file
+	node2, err := parseProtoFile(filePath2)
 	if err != nil {
-		return fileContent, fmt.Errorf("failed to format proto file: %w", err)
+		return false, fmt.Errorf("error parsing .proto file: %v", err)
 	}
 
-	obj, err := readBucket.Get(ctx, fileName)
+	// Compare everything but the Name field since Name is the file path
+	newName := " "
+	node1.FileDescriptorProto().Name = &newName
+	node2.FileDescriptorProto().Name = &newName
+
+	// Log INFO node1 and node 2 FileDescriptorProto().String to see differences
+	log.Printf("[INFO] Proto File Descriptor 1: %s", node1.FileDescriptorProto().String())
+	log.Printf("[INFO] Proto File Descriptor 2: %s", node2.FileDescriptorProto().String())
+
+	// Use reflect.DeepEqual to compare the nodes
+	return reflect.DeepEqual(node1.FileDescriptorProto(), node2.FileDescriptorProto()), nil
+}
+
+func parseProtoFile(filename string) (parser.Result, error) {
+	f, err := os.Open(filename)
 	if err != nil {
-		return fileContent, fmt.Errorf("failed to get formatted proto file '%s': %w", fullFilepath, err)
+		return nil, err
 	}
-	defer obj.Close()
-
-	// Read the file content
-	content, err := io.ReadAll(obj)
+	defer func() {
+		_ = f.Close()
+	}()
+	errHandler := reporter.NewHandler(nil)
+	res, err := parser.Parse(filename, f, errHandler)
 	if err != nil {
-		return fileContent, fmt.Errorf("failed to read formatted proto file contents: %w", err)
+		return nil, err
 	}
-
-	fileContent = string(content)
-
-	return fileContent, finalErr
+	return parser.ResultFromAST(res, true, errHandler)
 }

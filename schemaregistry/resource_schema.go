@@ -41,7 +41,7 @@ func resourceSchema() *schema.Resource {
 					schemaEquals, err := CompareASTs(newState.(string), oldState.(string))
 					if err != nil {
 						// If theres an error diff should be true, indicating something is wrong?
-						log.Printf("[INFO] err")
+						log.Printf("[ERROR] %v", err)
 					}
 
 					schemaHasChange = !schemaEquals
@@ -77,20 +77,16 @@ func resourceSchema() *schema.Resource {
 							oldJSON, _ := structure.NormalizeJsonString(old)
 							schemaEquals = newJSON == oldJSON
 						} else if strings.ToLower(schemaTypeStr) == "protobuf" {
-							log.Printf("[INFO] Schemas new %s", new)
-							log.Printf("[INFO] Schemas old %s", old)
+							log.Printf("[INFO] Schema new: \n`%s`", new)
+							log.Printf("[INFO] Schema old: \n`%s`", old)
 							var err error
 							schemaEquals, err = CompareASTs(new, old)
-
-							log.Printf("[INFO] Schemas equals %v", schemaEquals)
 							if err != nil {
 								// If theres an error diff should be true, indicating something is wrong?
-								log.Printf("[INFO] err %v", schemaEquals)
+								log.Printf("[ERROR] schema %v", err)
 							}
 						}
 					}
-
-					log.Printf("[INFO] Schemas Equal %s %t", d.Get("schema_type").(string), schemaEquals)
 
 					return schemaEquals
 				},

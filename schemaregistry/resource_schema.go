@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"os/exec"
-	"regexp"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
@@ -26,34 +23,39 @@ func resourceSchema() *schema.Resource {
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
-		CustomizeDiff: customdiff.All(
-			customdiff.ComputedIf("version", func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) bool {
+		CustomizeDiff: customdiff.ComputedIf("version", func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) bool {
 
-				var schemaHasChange bool
-				oldState, newState := d.GetChange("schema")
+			var schemaHasChange bool
+			oldState, newState := d.GetChange("schema")
 
-				if schemaTypeStr, ok := d.Get("schema_type").(string); ok {
-					if strings.ToLower(schemaTypeStr) == "json" {
-						newJSON, _ := structure.NormalizeJsonString(newState)
-						oldJSON, _ := structure.NormalizeJsonString(oldState)
-						schemaHasChange = newJSON != oldJSON
-					} else if strings.ToLower(schemaTypeStr) == "avro" {
-						newJSON, _ := structure.NormalizeJsonString(newState)
-						oldJSON, _ := structure.NormalizeJsonString(oldState)
-						schemaHasChange = newJSON != oldJSON
-					} else if strings.ToLower(schemaTypeStr) == "protobuf" {
-						newProtoString := formatProtoString(newState.(string))
-						oldProtoString := formatProtoString(oldState.(string))
-
-						schemaHasChange = oldProtoString != newProtoString
+			if schemaTypeStr, ok := d.Get("schema_type").(string); ok {
+				if strings.ToLower(schemaTypeStr) == "json" {
+					newJSON, _ := structure.NormalizeJsonString(newState)
+					oldJSON, _ := structure.NormalizeJsonString(oldState)
+					schemaHasChange = newJSON != oldJSON
+				} else if strings.ToLower(schemaTypeStr) == "avro" {
+					newJSON, _ := structure.NormalizeJsonString(newState)
+					oldJSON, _ := structure.NormalizeJsonString(oldState)
+					schemaHasChange = newJSON != oldJSON
+				} else if strings.ToLower(schemaTypeStr) == "protobuf" {
+					newProtoString, err := FormatProtobufString(newState.(string))
+					if err != nil {
+						// If theres an error diff should be true, indicating something is wrong?
+						println("err")
 					}
-				}
-				log.Printf("[INFO] Schemas Equal %t", schemaHasChange)
-				log.Printf("[INFO] Version Change %t", d.HasChange("version"))
+					oldProtoString, err := FormatProtobufString(oldState.(string))
+					if err != nil {
+						println("err")
+					}
 
-				return schemaHasChange || d.HasChange("version")
-			}),
-		),
+					schemaHasChange = oldProtoString != newProtoString
+				}
+			}
+			log.Printf("[INFO] Schemas Equal %t", schemaHasChange)
+			log.Printf("[INFO] Version Change %t", d.HasChange("version"))
+
+			return schemaHasChange || d.HasChange("version")
+		}),
 		Schema: map[string]*schema.Schema{
 			"subject": {
 				Type:        schema.TypeString,
@@ -78,8 +80,16 @@ func resourceSchema() *schema.Resource {
 							oldJSON, _ := structure.NormalizeJsonString(old)
 							schemaEquals = newJSON == oldJSON
 						} else if strings.ToLower(schemaTypeStr) == "protobuf" {
-							newProtoString := formatProtoString(new)
-							oldProtoString := formatProtoString(old)
+							newProtoString, err := FormatProtobufString(new)
+							if err != nil {
+								println("err")
+							}
+
+							oldProtoString, err := FormatProtobufString(old)
+							if err != nil {
+								println("err")
+							}
+
 							schemaEquals = newProtoString == oldProtoString
 						}
 					}
@@ -128,59 +138,6 @@ func resourceSchema() *schema.Resource {
 			},
 		},
 	}
-}
-
-func formatProtoString(protoSchemaString string) string {
-	re := regexp.MustCompile(`\s+`)
-	protoSchemaString = re.ReplaceAllString(protoSchemaString, " ")
-
-	// Create a custom temporary directory
-	// Have to create a custom tmp dir because otherwise the original one has incorrect permissions to create a temp file and then read it later
-	customTempDir := "./custom-temp"
-	if err := os.MkdirAll(customTempDir, 0755); err != nil {
-		log.Fatalf("Error creating custom temp directory: %v", err)
-	}
-	defer os.RemoveAll(customTempDir) // Clean up the directory afterwards
-
-	// Create a temporary file
-	tmpFile, err := os.CreateTemp(customTempDir, "*.proto")
-	if err != nil {
-		log.Println("[INFO] Error creating temporary file:", err)
-		// TODO raise error here
-	}
-
-	defer os.Remove(tmpFile.Name()) // Clean up the file afterwards
-
-	// Write the protobuf string to the file
-	if _, err := tmpFile.WriteString(protoSchemaString); err != nil {
-		log.Println("[INFO] Error writing to temporary file:", err)
-		// TODO raise error here
-	}
-
-	// Close the file to ensure all data is flushed
-	if err := tmpFile.Close(); err != nil {
-		log.Println("[INFO] Error closing temporary file:", err)
-		// TODO raise error here
-	}
-
-	log.Println("[INFO] Error FILENAME:", tmpFile.Name())
-
-	// Run the buf format command on the temporary file
-	cmd := exec.Command("buf", "format", tmpFile.Name())
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("[INFO] Error running buf format: %v\nOutput:\n%s", err, string(output))
-		// TODO raise error here
-	}
-
-	outputString := string(output)
-
-	if err != nil {
-		log.Fatalf("Error running buf command: %v", err)
-	}
-
-	return outputString
-
 }
 
 func schemaCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {

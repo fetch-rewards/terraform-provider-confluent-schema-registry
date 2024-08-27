@@ -1,38 +1,9 @@
 package schemaregistry
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
-
-func TestCreateTemporaryProtoFile(t *testing.T) {
-	var protoSchemaString string = "syntax = \"proto3\";"
-
-	protoFilePath, err := CreateTemporaryProtoFile(protoSchemaString)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Logf("\nFile Path: `%s`", protoFilePath)
-
-	// Read from the tmp file and verify it matches the correct string
-	// Read the entire file content
-	content, err := os.ReadFile(protoFilePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Convert the byte slice to a string
-	fileContent := string(content)
-
-	t.Logf("\nFile Contents: `%s`", fileContent)
-
-	if fileContent != protoSchemaString {
-		t.Errorf("File content does not match original str")
-	}
-
-}
 
 func TestProtoCompileASTComparison(t *testing.T) {
 	originalProtoSchema := `syntax = "proto3";package com.fetchrewards.locationservice.proto;option java_outer_classname = "FidoLocationTrackerProto";

@@ -2,9 +2,10 @@ package schemaregistry
 
 import (
 	"fmt"
+	"io"
 	"log"
-	"os"
 	"reflect"
+	"strings"
 
 	"github.com/bufbuild/protocompile/parser"
 	"github.com/bufbuild/protocompile/reporter"
@@ -20,62 +21,17 @@ func extractSchemaVersionID(id string) string {
 	return id
 }
 
-// Create a temporary .proto file based on a proto schema string and return
-// the path of the file which corresponds to the schema
-func CreateTemporaryProtoFile(protoSchemaString string) (string, error) {
-	var tempFileName string = ""
-	customTempDir, err := os.MkdirTemp("", "proto-")
-	if err != nil {
-		return tempFileName, fmt.Errorf("error creating custom temp directory: %v", err)
-	}
-
-	// I dont think we need this since we moved this to utils instead ans separated into 2 funcs.
-	// we can no long clean up the file at the end of the func, maybe at the end of the formatting one though
-	// defer os.RemoveAll(customTempDir) // Clean up the directory afterwards
-
-	// Create a temporary file
-	tmpFile, err := os.CreateTemp(customTempDir, "*.proto")
-	if err != nil {
-		return tempFileName, fmt.Errorf("error creating temporary file: %v", err)
-	}
-
-	// Write the protobuf string to the file
-	if _, err := tmpFile.WriteString(protoSchemaString); err != nil {
-		return tempFileName, fmt.Errorf("error writing to temporary file: %v", err)
-	}
-
-	// Close the file to ensure all data is flushed
-	if err := tmpFile.Close(); err != nil {
-		return tempFileName, fmt.Errorf("error closing temporary file: %v", err)
-	}
-
-	tempFileName = tmpFile.Name()
-
-	return tempFileName, err
-}
-
 // CompareASTs compares two AST nodes for equality
 func CompareASTs(protoSchemaString1 string, protoSchemaString2 string) (bool, error) {
-	filePath1, err := CreateTemporaryProtoFile(protoSchemaString1)
-
-	if err != nil {
-		return false, fmt.Errorf("failed to create temporary proto file: %w", err)
-	}
-
-	filePath2, err := CreateTemporaryProtoFile(protoSchemaString2)
-
-	if err != nil {
-		return false, fmt.Errorf("failed to create temporary proto file: %w", err)
-	}
 
 	// Parse the .proto file
-	node1, err := parseProtoFile(filePath1)
+	node1, err := protoStringToAST(protoSchemaString1)
 	if err != nil {
 		return false, fmt.Errorf("error parsing .proto file: %v", err)
 	}
 
 	// Parse the .proto file
-	node2, err := parseProtoFile(filePath2)
+	node2, err := protoStringToAST(protoSchemaString2)
 	if err != nil {
 		return false, fmt.Errorf("error parsing .proto file: %v", err)
 	}
@@ -93,16 +49,10 @@ func CompareASTs(protoSchemaString1 string, protoSchemaString2 string) (bool, er
 	return reflect.DeepEqual(node1.FileDescriptorProto(), node2.FileDescriptorProto()), nil
 }
 
-func parseProtoFile(filename string) (parser.Result, error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = f.Close()
-	}()
+func protoStringToAST(protoSchemaString string) (parser.Result, error) {
 	errHandler := reporter.NewHandler(nil)
-	res, err := parser.Parse(filename, f, errHandler)
+	var reader io.Reader = strings.NewReader(protoSchemaString)
+	res, err := parser.Parse(" ", reader, errHandler)
 	if err != nil {
 		return nil, err
 	}

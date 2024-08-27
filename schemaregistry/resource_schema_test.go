@@ -137,7 +137,7 @@ func TestAccResourceSchema_updateIncompatible(t *testing.T) {
 			},
 			{
 				Config:      fmt.Sprintf(fixtureCreateSchema, subject, fixtureAvro3),
-				ExpectError: regexp.MustCompile(`invalid "schema": incompatible`),
+				ExpectError: regexp.MustCompile(`invalid 'schema': Incompatible`),
 			},
 		},
 	})

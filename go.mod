@@ -1,6 +1,6 @@
 module terraform-provider-confluent-schema-registry
 
-go 1.23.0
+go 1.23
 
 require (
 	github.com/ashleybill/srclient v0.6.3

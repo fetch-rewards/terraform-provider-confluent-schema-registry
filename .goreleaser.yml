@@ -51,6 +51,6 @@ release:
   github:
     owner: "fetch-rewards"
     name: "terraform-provider-confluent-schema-registry"
-  draft: true # after testing set this back to true
+  # draft: true # after testing set this back to true
 changelog:
   skip: true

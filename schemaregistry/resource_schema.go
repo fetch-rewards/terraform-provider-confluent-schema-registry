@@ -3,6 +3,7 @@ package schemaregistry
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
@@ -23,13 +24,33 @@ func resourceSchema() *schema.Resource {
 			StateContext: schema.ImportStatePassthroughContext,
 		},
 		CustomizeDiff: customdiff.ComputedIf("version", func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) bool {
-			oldState, newState := d.GetChange("schema")
-			newJSON, _ := structure.NormalizeJsonString(newState)
-			oldJSON, _ := structure.NormalizeJsonString(oldState)
-			schemaHasChange := newJSON != oldJSON
 
-			// explicitly set a version change on schema change and make dependencies aware of a
-			// version changed at `plan` time (computed field)
+			var schemaHasChange bool
+			oldState, newState := d.GetChange("schema")
+
+			if schemaTypeStr, ok := d.Get("schema_type").(string); ok {
+				if strings.ToLower(schemaTypeStr) == "json" {
+					newJSON, _ := structure.NormalizeJsonString(newState)
+					oldJSON, _ := structure.NormalizeJsonString(oldState)
+					schemaHasChange = newJSON != oldJSON
+				} else if strings.ToLower(schemaTypeStr) == "avro" {
+					newJSON, _ := structure.NormalizeJsonString(newState)
+					oldJSON, _ := structure.NormalizeJsonString(oldState)
+					schemaHasChange = newJSON != oldJSON
+				} else if strings.ToLower(schemaTypeStr) == "protobuf" {
+					schemaEquals, err := CompareASTs(newState.(string), oldState.(string))
+					if err != nil {
+						// If theres an error diff should be true, indicating something is wrong?
+						log.Printf("[ERROR] %v", err)
+					}
+
+					schemaHasChange = !schemaEquals
+
+				}
+			}
+			log.Printf("[INFO] Schemas Change %t", schemaHasChange)
+			log.Printf("[INFO] Version Change %t", d.HasChange("version"))
+
 			return schemaHasChange || d.HasChange("version")
 		}),
 		Schema: map[string]*schema.Schema{
@@ -44,9 +65,30 @@ func resourceSchema() *schema.Resource {
 				Required:    true,
 				Description: "The schema string",
 				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
-					newJSON, _ := structure.NormalizeJsonString(new)
-					oldJSON, _ := structure.NormalizeJsonString(old)
-					return newJSON == oldJSON
+					var schemaEquals bool
+
+					if schemaTypeStr, ok := d.Get("schema_type").(string); ok {
+						if strings.ToLower(schemaTypeStr) == "json" {
+							newJSON, _ := structure.NormalizeJsonString(new)
+							oldJSON, _ := structure.NormalizeJsonString(old)
+							schemaEquals = newJSON == oldJSON
+						} else if strings.ToLower(schemaTypeStr) == "avro" {
+							newJSON, _ := structure.NormalizeJsonString(new)
+							oldJSON, _ := structure.NormalizeJsonString(old)
+							schemaEquals = newJSON == oldJSON
+						} else if strings.ToLower(schemaTypeStr) == "protobuf" {
+							log.Printf("[INFO] Schema new: \n`%s`", new)
+							log.Printf("[INFO] Schema old: \n`%s`", old)
+							var err error
+							schemaEquals, err = CompareASTs(new, old)
+							if err != nil {
+								// If theres an error diff should be true, indicating something is wrong?
+								log.Printf("[ERROR] schema %v", err)
+							}
+						}
+					}
+
+					return schemaEquals
 				},
 			},
 			"schema_id": {
@@ -231,11 +273,12 @@ func FromRegistryReferences(references []srclient.Reference) []interface{} {
 func ToSchemaType(schemaType interface{}) srclient.SchemaType {
 	returnType := srclient.Avro
 
-	if schemaType == "json" {
-		returnType = srclient.Json
-	}
-	if schemaType == "protobuf" {
-		returnType = srclient.Protobuf
+	if schemaTypeStr, ok := schemaType.(string); ok {
+		if strings.ToLower(schemaTypeStr) == "json" {
+			returnType = srclient.Json
+		} else if strings.ToLower(schemaTypeStr) == "protobuf" {
+			returnType = srclient.Protobuf
+		}
 	}
 
 	return returnType

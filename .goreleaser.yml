@@ -1,6 +1,8 @@
 # Visit https://goreleaser.com for documentation on how to customize this
 # behavior.
 
+version: 2
+
 before:
   hooks:
     # this is just an example and not a requirement for provider building/publishing..
@@ -49,6 +51,3 @@ release:
   github:
     owner: "fetch-rewards"
     name: "terraform-provider-confluent-schema-registry"
- # draft: true TODO after testing set this back to true
-changelog:
-  skip: true
